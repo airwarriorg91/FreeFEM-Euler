@@ -1,0 +1,115 @@
+load "PETSc"
+load "gmsh"
+macro dimension()3// EOM            // 2D or 3D
+include "macro_ddm.idp"             // additional DDM functions
+
+verbosity = 0;
+
+//constants
+real dt = 0.005; // dt: time step 
+int i, n = 2400;  // n: Total number of time steps
+int savefreq = 40; //frequency at which the vtk file is saved.
+real t;
+mpiComm comm(mpiCommWorld, 0, 0);
+
+real Eps=1e-12; //Tolerance
+int[int] Order = [1, 1];
+string DataName = "Velocity Pressure";
+mesh3 Th = gmshload3("cyl.msh");
+//plot(Th, wait=1);
+Mat A;
+macro def(i)[i, i#B, i#C, i#D]//
+macro init(i)[i, i, i, i]//
+macro E() [P2, P2, P2, P1]//
+//, periodic=[[3,x,z],[4,x,z],[5,x,z],[6,x,z],[3,x,y],[5,x,y],[4,x,y],[6,x,y]]//
+createMat(Th, A, E);
+
+fespace Vh(Th, E);
+
+Vh [u1, u2, u3, p];
+Vh [v1, v2, v3, q];
+Vh [un1, un2, un3, pn];
+
+fespace Vh1(Th,[P2,P2,P2]);
+varf bdryn([w1,w2,w3],[v1,v2,v3])=int2d(Th,1)(v1*N.x+v2*N.y+v3*N.z);
+Vh1 [normalappx,normalappy,normalappz];
+normalappx[]=bdryn(0,Vh1);
+
+macro grad(u) [dx(u), dy(u), dz(u)]//
+macro UGrad(un, u) ((un#1)*grad(u#1) + (un#2)*grad(u#2) + (un#3)*grad(u#3))//
+macro con(un,dt) [convect([un#1,un#2,un#3],-dt,un#1),convect([un#1,un#2,un#3],-dt,un#2),convect([un#1,un#2,un#3],-dt,un#3)]//
+macro div(u) (dx(u#1) + dy(u#2) + dz(u#3))//
+
+real Beta = 10; //Artificial Compressibility parameter
+
+varf GE([u1,u2,u3,p],[v1,v2,v3,q])
+   =int3d(Th)
+   ([u1,u2,u3]'*[v1,v2,v3]/dt
+   +grad(p)'*[v1,v2,v3]
+   +div(u)*q
+   +Beta*p*q/dt)
+   +int3d(Th)
+   (con(un,dt)'*[v1,v2,v3]/dt
+   +Beta*pn*q/dt
+   )
+   +on(1, u1=1, u2=0, u3=0)
+   +int2d(Th,qft=qf1pTlump,7)(1e10*(u1*normalappx+u2*normalappy+u3*normalappz)*(v1*normalappx+v2*normalappy+v3*normalappz))
+   +on(9, u2=0)
+   +on(10, u2=0)
+   +on(11, u3=0)
+   +on(12, u3=0);
+   
+set(A, sparams="-pc_type hypre");
+real[int] b(Vh.ndof);
+
+real T0 = clock(); //start time
+
+real err = 0;
+
+while(i<=n){ //time loop
+
+   un1[]=u1[];
+
+   A = GE(Vh, Vh);
+   b = GE(0, Vh);
+
+   u1[] = A^-1 * b;   
+
+   t = clock()-T0;
+
+   err = sqrt(int3d(Th)((square(u1-un1)+square(u2-un2)+square(u3-un3))/volume));
+
+   if(mpirank==0){
+      cout <<"==========================================================================================" << endl;
+      cout << "Iteration: " << i <<endl;
+      cout << "Time Elapsed: " <<floor(t/3600) <<" Hrs:"<<floor(t/60)<<" Mins:"<<t%60<<" s"<< endl;
+      cout << "Error: "<< err <<endl;
+      cout <<"==========================================================================================" << endl;
+      
+      // if(i%savefreq==0){
+      //    savevtk("visu/visu.vtu", Th, [u1,u2,u3], p, dataname=DataName, order=Order, append=i ? true : false);
+      // }
+
+      if(err<=1e-9){
+         cout <<"==========================================================================================" << endl;
+         cout << "Solution Converged"<<endl;
+         cout <<"==========================================================================================" << endl;
+         break;
+      }
+   }
+   i++;
+}
+
+ 
+if(mpirank==0){
+   cout <<"==========================================================================================" << endl;
+   cout <<"Saving the Visualization File "<<endl;
+   cout <<"==========================================================================================" << endl;
+}
+savevtk("visu/visu.vtu", Th, [u1,u2,u3], p, dataname=DataName, order=Order);
+if(mpirank==0){
+   cout <<"==========================================================================================" << endl;
+   cout <<"Simulation finished successfully !"<<endl;
+   cout <<"==========================================================================================" << endl;
+}
+
