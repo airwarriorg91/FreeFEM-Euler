@@ -1,0 +1,134 @@
+// Load necessary libraries
+load "msh3"
+load "iovtk"
+verbosity = 0;
+
+// Define file path for saving output
+string filename = "./2D/b-5/";
+
+// Define domain dimensions
+real h = 12, w = 20;
+real dn = 0.5;
+
+// Define domain boundaries
+border inlet(t = h/2, -h/2) { x = -w/2; y = t; label = 1; }
+border outlet(t = -h/2, h/2) { x = w/2; y = t; label = 2; }
+border top(t = w/2, -w/2) { x = t; y = h/2; label = 3; }
+border bottom(t = -w/2, w/2) { x = t; y = -h/2; label = 4; }
+border cyl(t = 0, 2*pi) { x = 0.5*cos(t); y = 0.5*sin(t); label = 5; }
+
+// Build mesh with defined boundaries
+mesh Th = buildmesh(inlet(h/dn) + bottom(w/dn) + outlet(h/dn) + top(w/dn) + cyl(-100));
+plot(Th, ps = filename + "mesh.eps");
+
+// Boundary labels
+// Inlet : 1
+// Outlet : 2
+// Top : 3
+// Bottom: 4
+// Cylinder: 5
+
+// Define finite element spaces
+fespace Vh(Th, P2);
+Vh u1, u2;  // Velocity components
+Vh v1, v2;  // Velocity test functions
+Vh un1, un2;
+Vh p;       // Pressure variable
+Vh q;       // Pressure test function
+Vh pn;
+
+// Time step and total number of steps
+real dt = 0.01;
+int n = 150;
+int i = 0;  // Initialize step counter
+real t;
+
+// Additional parameters and variables
+int[int] Order = [1, 1, 1];
+string DataName = "U V Pressure";
+real T0 = clock();  // Start time
+real Beta = 1e-5;
+real err = 0;
+real H, m, s;
+
+// Define another finite element space for boundary approximation
+fespace Vh1(Th, [P2, P2]);
+Vh1 [normalappx, normalappy], [w1, w2];
+
+// Solve for boundary normal approximation
+solve bdryn([normalappx, normalappy], [w1, w2])
+  = int1d(Th)(w1*normalappx + w2*normalappy)
+  - int1d(Th)(w1*N.x + w2*N.y)
+  + int2d(Th)(1.e-8*(w1*normalappx + w2*normalappy));
+
+// Define macros for gradients and convection
+macro grad(u) [dx(u), dy(u)] //
+macro UGrad(un, u) ((un#1)*grad(u#1) + (un#2)*grad(u#2)) //
+macro con(un, dt) [convect([un#1, un#2], -dt, un#1), convect([un#1, un#2], -dt, un#2)] //
+macro div(u) (dx(u#1) + dy(u#2)) //
+
+// Initialize the error file
+{
+   ofstream file(filename + "err.csv");
+   file << "Iteration,Error" << endl;
+   file.flush;
+}
+
+ofstream file(filename + "err.csv", append);
+
+// Time loop
+while (i <= n) {
+   // Velocity at nth time step
+   un1 = u1; 
+   un2 = u2; 
+   pn = p;
+
+   // Solve for the next time step
+   solve GE([u1, u2, p], [v1, v2, q])
+     = int2d(Th)
+     ([u1, u2]'*[v1, v2]/dt
+     + un1*(grad(u1)'*[v1, v2])
+     + un2*(grad(u2)'*[v1, v2])
+     - div(v)*p
+     - div(u)*q
+     - Beta*p*q/dt
+     )
+     - int2d(Th)(
+     [un1, un2]'*[v1, v2]/dt
+     - Beta*pn*q/dt   
+     )
+     + int1d(Th, 2)(u1*v1/dt + un1*dx(u1)*v1 + u2*v2/dt + un1*v2*dx(u2))
+     - int1d(Th, 2)(un1*v1/dt + un2*v2/dt)
+     + on(1, u1 = 1, u2 = 0)
+     + int1d(Th, qft = qf1pTlump, 5)(1e10*(u1*normalappx + u2*normalappy)*(v1*normalappx + v2*normalappy))
+     + int1d(Th, qfe = qf1pE, 5)(1e10*(u1*N.x + u2*N.y)*(v1*N.x + v2*N.y))
+     + on(3, u2 = 0)
+     + on(4, u2 = 0);
+
+   // Calculate elapsed time
+   t = clock() - T0; 
+   H = t/3600; 
+   m = (H - floor(H))*60; 
+   s = (m - floor(m))*60;
+
+   // Calculate error
+   err = sqrt(int2d(Th)(square(u1 - un1) + square(u2 - un2))/Th.area);
+
+   // Output current iteration and error
+   cout << "Iteration: " << i << endl;
+   cout << "Time Elapsed: " << floor(H) << " Hrs:" << floor(m) << " Mins:" << floor(s) << " s" << endl;
+   cout << "Error: " << err << endl;
+   file << i << "," << err << endl;
+   file.flush;
+
+   // Break if error is below threshold
+   if (err <= 1e-6) {
+      break;
+   }
+
+   i++;
+}
+
+// Save the results to a vtk file
+savevtk(filename + "visu.vtu", Th, u1, u2, p, dataname = DataName, order = Order); // saves the vtk file
+cout << "Visualization file saved! Simulation completed." << endl;
