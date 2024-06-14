@@ -27,7 +27,7 @@ To use this code, you need to have FreeFEM and GMSH installed on your system.
 
 2. **Mesh Refinement**: The mesh should be small enough near the body wall so that the flow can be computed accurately and solution doesn't diverge.
 
-3. **Artificial Compressibility**: An appropriate value of artificial compressibility should be choosen so that the solution converges quickly. Generally, the value of $\beta$ exists between 0 and 1. The default value of $\beta$ is $10^{-9}$. (For more details and convergence study, refer to the [report](/Test/report/report.pdf))
+3. **Artificial Compressibility**: An appropriate value of artificial compressibility should be choosen so that the solution converges quickly. Generally, the value of $\beta$ exists between 0 and 1. The default value of $\beta$ is $10^{-9}$. (For more details and convergence study, refer to the [report](https://github.com/airwarriorg91/FreeFEM-Euler/blob/master/Test/report/report.pdf).
 ### 2D Computations
 
 For 2D computations, the geometry and mesh are created within the FreeFEM script. You can find the 2D script in the `2D` directory.
@@ -51,7 +51,7 @@ Will be updated soon.
 ### 2D Example
 
 A sample 2D computation is provided in the `2D` directory. The script `Solver2D.edp` demonstrates how to set up and solve the flow around a cylinder. The results are saved in VTK format for visualization. The code is tested for different values of N (number of points on cylinder surface), $\beta$ (Artificial compressibility) and domain
-size. The detailed [report](/Test/report/report.pdf) for the test along with the visualization files are present in the `Test/2D` directory.
+size. The detailed [report](https://github.com/airwarriorg91/FreeFEM-Euler/blob/master/Test/report/report.pdf) for the test along with the visualization files are present in the `Test/2D` directory.
 
 ![The steady state solution for flow around a cylinder computed using the code](/Test/2D/n50/cyl.png)
 
