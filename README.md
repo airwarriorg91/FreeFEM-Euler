@@ -1,5 +1,5 @@
 # FreeFEM-Euler
-This repository contains code to solve the incompressible inviscid Euler equations using the artificial compressibility method. The code is implemented in FreeFEM and supports both 2D and 3D computations. For 2D computations, the geometry is created directly in FreeFEM, while for 3D computations, GMSH-generated meshes are imported.
+This repository contains code to solve the incompressible inviscid Euler equations using the artificial compressibility method. The code is implemented in FreeFEM and supports both 2D and 3D computations. For 2D computations, the geometry is created directly in FreeFEM as well as GMSH-generated meshes can be imported, while for 3D computations, only GMSH-generated meshes are imported.
 
 ## Table of Contents
 
@@ -30,14 +30,22 @@ To use this code, you need to have FreeFEM and GMSH installed on your system.
 3. **Artificial Compressibility**: An appropriate value of artificial compressibility should be choosen so that the solution converges quickly. Generally, the value of $\beta$ exists between 0 and 1. The default value of $\beta$ is $10^{-9}$. (For more details and convergence study, refer to the [report](https://github.com/airwarriorg91/FreeFEM-Euler/blob/master/Test/report/report.pdf).
 ### 2D Computations
 
-For 2D computations, the geometry and mesh are created within the FreeFEM script. You can find the 2D script in the `2D` directory.
+For 2D computations, you can find the 2D script in the `2D` directory.
 
 1. Navigate to the `2D` directory:
    ```sh
    cd 2D
    ```
+2. If GMSH geometry is to be imported, uncomment the lines 26-27  and comment lines 12-23 in `solver2D.edp`. The `.msh` file should be exported with the following settings in the `.geo` script file of GMSH. For 2D, the boundaries should be defined as Physical Curves whereas the surface should be defined as Physical Surface. An example of GMSH script file is given in `2D/example.geo`. 
 
-2. Run the FreeFEM script:
+   ```
+   Mesh.Format = 1;
+   Mesh.MshFileVersion = 2.2; 
+   Mesh.SaveAll = 0;
+   Mesh.Binary = 0;
+   ```
+
+3. Run the FreeFEM script:
    ```sh
    FreeFem++ solver2D.edp
    ```

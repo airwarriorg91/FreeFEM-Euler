@@ -1,24 +1,30 @@
 // Load necessary libraries
 load "msh3"
 load "iovtk"
+load "gmsh"
 verbosity = 0;
 
 // Define file path for saving output
-string filename = "./2D/b-5/";
+string filename = "./case/";
 
-// Define domain dimensions
-real h = 12, w = 20;
-real dn = 0.5;
+
+//Uncomment Line 12-23 to construct a mesh in FreeFEM
+// // Define domain dimensions
+// real h = 12, w = 20;
+// real dn = 0.5;
 
 // Define domain boundaries
-border inlet(t = h/2, -h/2) { x = -w/2; y = t; label = 1; }
-border outlet(t = -h/2, h/2) { x = w/2; y = t; label = 2; }
-border top(t = w/2, -w/2) { x = t; y = h/2; label = 3; }
-border bottom(t = -w/2, w/2) { x = t; y = -h/2; label = 4; }
-border cyl(t = 0, 2*pi) { x = 0.5*cos(t); y = 0.5*sin(t); label = 5; }
+// border inlet(t = h/2, -h/2) { x = -w/2; y = t; label = 1; }
+// border outlet(t = -h/2, h/2) { x = w/2; y = t; label = 2; }
+// border top(t = w/2, -w/2) { x = t; y = h/2; label = 3; }
+// border bottom(t = -w/2, w/2) { x = t; y = -h/2; label = 4; }
+// border cyl(t = 0, 2*pi) { x = 0.5*cos(t); y = 0.5*sin(t); label = 5; }
 
-// Build mesh with defined boundaries
-mesh Th = buildmesh(inlet(h/dn) + bottom(w/dn) + outlet(h/dn) + top(w/dn) + cyl(-100));
+// // Build mesh with defined boundaries
+// mesh Th = buildmesh(inlet(h/dn) + bottom(w/dn) + outlet(h/dn) + top(w/dn) + cyl(-100));
+
+//Uncomment line 26-27 to import a 2D GMSH mesh
+mesh Th = gmshload("./mesh.msh");
 plot(Th, ps = filename + "mesh.eps");
 
 // Boundary labels
@@ -38,8 +44,8 @@ Vh q;       // Pressure test function
 Vh pn;
 
 // Time step and total number of steps
-real dt = 0.01;
-int n = 150;
+real dt = 1e-4;
+int n = 200;
 int i = 0;  // Initialize step counter
 real t;
 
@@ -47,9 +53,10 @@ real t;
 int[int] Order = [1, 1, 1];
 string DataName = "U V Pressure";
 real T0 = clock();  // Start time
-real Beta = 1e-5;
+real Beta = 1e-12;
 real err = 0;
 real H, m, s;
+bool diverged = false;
 
 // Define another finite element space for boundary approximation
 fespace Vh1(Th, [P2, P2]);
@@ -126,9 +133,20 @@ while (i <= n) {
       break;
    }
 
+   if (err >= 1){
+      diverged = true;
+      break;
+   }
    i++;
 }
 
 // Save the results to a vtk file
 savevtk(filename + "visu.vtu", Th, u1, u2, p, dataname = DataName, order = Order); // saves the vtk file
-cout << "Visualization file saved! Simulation completed." << endl;
+
+if (diverged){
+   cout<<"Simulation diverged !"<<endl;
+}
+else{
+   cout << "Visualization file saved! Simulation completed." << endl;
+}
+
